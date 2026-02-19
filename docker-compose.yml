@@ -1,0 +1,22 @@
+services:
+  frontend:
+    build: ./frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+  backend:
+    build: ./backend
+    ports:
+      - "5000:5000"
+    environment:
+      - PORT=5000
+      - PYTHON_SERVICE_URL=http://microservices:8000
+    depends_on:
+      - microservices
+
+  microservices:
+    build: ./microservices
+    ports:
+      - "8000:8000"
