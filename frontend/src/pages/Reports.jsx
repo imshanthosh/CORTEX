@@ -2,17 +2,10 @@
  * Reports Page — Analysis History & Export
  * Shows user-specific reports and historical analyses.
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-
-const MOCK_REPORTS = [
-    { id: 1, product: 'AEGIS', type: 'Fragility Analysis', scenario: 'Flood Event', date: '2026-02-19 08:15', summary: '2 critical zones, 1 warning zone. Emergency dispatch activated.', maxScore: 85.3 },
-    { id: 2, product: 'Marine', type: 'Vessel Scan', scenario: 'Full Fleet', date: '2026-02-19 07:45', summary: '8 vessels scanned. 1 distress, 1 suspicious, 6 normal.', maxScore: null },
-    { id: 3, product: 'AquaCascade', type: 'Propagation Sim', scenario: 'Oil Spill', date: '2026-02-18 22:30', summary: '12-hour simulation. Max area 4.2 km². 1 treatment plant at risk.', maxScore: null },
-    { id: 4, product: 'AEGIS', type: 'Fragility Analysis', scenario: 'Normal', date: '2026-02-18 16:00', summary: 'All zones stable. No dispatch required.', maxScore: 12.4 },
-    { id: 5, product: 'AEGIS', type: 'Fragility Analysis', scenario: 'Power Failure', date: '2026-02-18 10:20', summary: '1 critical zone, 1 warning zone. Backup pumps recommended.', maxScore: 78.1 },
-    { id: 6, product: 'AquaCascade', type: 'Propagation Sim', scenario: 'Sewage Overflow', date: '2026-02-17 14:00', summary: '24-hour simulation. Max area 1.8 km². No infrastructure at risk.', maxScore: null },
-];
+import axios from 'axios';
+import { useAuth } from '../contexts/AuthContext';
 
 const PRODUCT_COLORS = {
     AEGIS: { text: 'text-cyan-400', badge: 'bg-cyan-500/10 border-cyan-500/20' },
@@ -21,8 +14,26 @@ const PRODUCT_COLORS = {
 };
 
 export default function Reports() {
+    const { user } = useAuth();
+    const [history, setHistory] = useState([]);
+    const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('all');
-    const filtered = filter === 'all' ? MOCK_REPORTS : MOCK_REPORTS.filter(r => r.product === filter);
+
+    useEffect(() => {
+        const fetchHistory = async () => {
+            if (!user) return;
+            try {
+                const res = await axios.get('/api/user/history', { params: { userId: user.uid } });
+                setHistory(res.data.history || []);
+            } catch (err) {
+                console.error('Failed to fetch history:', err);
+            }
+            setLoading(false);
+        };
+        fetchHistory();
+    }, [user]);
+
+    const filtered = filter === 'all' ? history : history.filter(r => r.product === filter);
 
     return (
         <div className="space-y-8">
@@ -33,7 +44,7 @@ export default function Reports() {
                     <h1 className="text-2xl font-bold text-white">Reports</h1>
                     <p className="text-sm text-slate-500 mt-1">Historical analyses and export capabilities</p>
                 </div>
-                <button className="btn-secondary px-5 py-2.5 text-sm">
+                <button className="btn-secondary px-5 py-2.5 text-sm" onClick={() => alert('CSV Export coming soon!')}>
                     📥 Export All (CSV)
                 </button>
             </div>
@@ -41,9 +52,9 @@ export default function Reports() {
             {/* ── Trend Summary Cards ──────────────────────────────── */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 {[
-                    { label: 'Total Analyses', value: MOCK_REPORTS.length, color: 'gradient-text', icon: '📊' },
-                    { label: 'This Week', value: 4, color: 'text-cyan-400', icon: '📅' },
-                    { label: 'Critical Events', value: 2, color: 'text-red-400', icon: '🚨' },
+                    { label: 'Total Analyses', value: history.length, color: 'gradient-text', icon: '📊' },
+                    { label: 'Critical Events', value: history.filter(h => h.summary?.toLowerCase().includes('critical') || h.summary?.toLowerCase().includes('distress')).length, color: 'text-red-400', icon: '🚨' },
+                    { label: 'Active Coverage', value: '100%', color: 'text-cyan-400', icon: '🛡️' },
                 ].map((s, i) => (
                     <motion.div
                         key={s.label}
@@ -85,48 +96,52 @@ export default function Reports() {
                     <h2 className="text-sm font-semibold text-white">Analysis History</h2>
                 </div>
                 <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                        <thead>
-                            <tr className="text-left text-slate-500 border-b border-slate-800/60 bg-slate-900/30">
-                                <th className="px-6 py-4 font-medium">Module</th>
-                                <th className="px-6 py-4 font-medium">Analysis Type</th>
-                                <th className="px-6 py-4 font-medium">Scenario</th>
-                                <th className="px-6 py-4 font-medium">Date</th>
-                                <th className="px-6 py-4 font-medium">Summary</th>
-                                <th className="px-6 py-4 font-medium text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filtered.map((report, i) => {
-                                const pc = PRODUCT_COLORS[report.product] || { text: 'text-gray-400', badge: 'bg-gray-500/10 border-gray-500/20' };
-                                return (
-                                    <motion.tr
-                                        key={report.id}
-                                        className="border-b border-slate-800/40 hover:bg-white/[0.02] transition-colors"
-                                        initial={{ opacity: 0 }}
-                                        animate={{ opacity: 1 }}
-                                        transition={{ delay: i * 0.04 }}
-                                    >
-                                        <td className="px-6 py-4">
-                                            <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg border ${pc.badge} ${pc.text}`}>
-                                                {report.product}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-slate-300">{report.type}</td>
-                                        <td className="px-6 py-4 text-slate-400">{report.scenario}</td>
-                                        <td className="px-6 py-4 text-slate-500 text-xs font-mono">{report.date}</td>
-                                        <td className="px-6 py-4 text-slate-400 text-xs max-w-xs">
-                                            <span className="line-clamp-2">{report.summary}</span>
-                                        </td>
-                                        <td className="px-6 py-4 text-right whitespace-nowrap">
-                                            <button className="text-xs text-cyan-400 hover:text-cyan-300 font-medium transition-colors mr-4">View</button>
-                                            <button className="text-xs text-slate-500 hover:text-slate-300 font-medium transition-colors">Export</button>
-                                        </td>
-                                    </motion.tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
+                    {loading ? (
+                        <div className="p-12 text-center text-slate-500">⏳ Loading analysis history...</div>
+                    ) : filtered.length === 0 ? (
+                        <div className="p-12 text-center text-slate-500">No analyses found. Run a scan in AEGIS or Marine to see results here.</div>
+                    ) : (
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="text-left text-slate-500 border-b border-slate-800/60 bg-slate-900/30">
+                                    <th className="px-6 py-4 font-medium">Module</th>
+                                    <th className="px-6 py-4 font-medium">Analysis Type</th>
+                                    <th className="px-6 py-4 font-medium">Date</th>
+                                    <th className="px-6 py-4 font-medium">Summary</th>
+                                    <th className="px-6 py-4 font-medium text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filtered.map((report, i) => {
+                                    const pc = PRODUCT_COLORS[report.product] || { text: 'text-gray-400', badge: 'bg-gray-500/10 border-gray-500/20' };
+                                    return (
+                                        <motion.tr
+                                            key={report.id}
+                                            className="border-b border-slate-800/40 hover:bg-white/[0.02] transition-colors"
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            transition={{ delay: i * 0.04 }}
+                                        >
+                                            <td className="px-6 py-4">
+                                                <span className={`text-xs font-semibold px-2.5 py-1 rounded-lg border ${pc.badge} ${pc.text}`}>
+                                                    {report.product}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-slate-300">{report.analysisType}</td>
+                                            <td className="px-6 py-4 text-slate-500 text-xs font-mono">{new Date(report.timestamp).toLocaleString()}</td>
+                                            <td className="px-6 py-4 text-slate-400 text-xs max-w-xs">
+                                                <span className="line-clamp-2">{report.summary}</span>
+                                            </td>
+                                            <td className="px-6 py-4 text-right whitespace-nowrap">
+                                                <button className="text-xs text-cyan-400 hover:text-cyan-300 font-medium transition-colors mr-4" onClick={() => alert('Detailed view coming soon!')}>View</button>
+                                                <button className="text-xs text-slate-500 hover:text-slate-300 font-medium transition-colors">Export</button>
+                                            </td>
+                                        </motion.tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    )}
                 </div>
             </div>
         </div>

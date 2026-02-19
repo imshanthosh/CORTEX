@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Polygon, Popup } from 'react-leaflet';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
+import { useAuth } from '../contexts/AuthContext';
 import 'leaflet/dist/leaflet.css';
 
 export default function MarineMonitor() {
@@ -13,6 +14,7 @@ export default function MarineMonitor() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [autoRefresh, setAutoRefresh] = useState(false);
+    const { user } = useAuth();
 
     const runAnalysis = useCallback(async () => {
         setLoading(true);
@@ -20,11 +22,22 @@ export default function MarineMonitor() {
         try {
             const res = await axios.post('/api/marine/analyze', {});
             setResult(res.data);
+
+            // Save to history
+            if (user) {
+                await axios.post('/api/user/history', {
+                    userId: user.uid,
+                    product: 'Marine',
+                    analysisType: 'Vessel Scan',
+                    summary: `${res.data.summary.total} vessels scanned. ${res.data.summary.distress} in distress.`,
+                    data: res.data
+                });
+            }
         } catch (err) {
             setError(err.response?.data?.error || 'Analysis failed. Ensure backend services are running.');
         }
         setLoading(false);
-    }, []);
+    }, [user]);
 
     useEffect(() => {
         if (!autoRefresh) return;

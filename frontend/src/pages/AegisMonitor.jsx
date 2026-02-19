@@ -6,6 +6,7 @@ import { useState, useRef } from 'react';
 import { MapContainer, TileLayer, CircleMarker, Polyline, Popup } from 'react-leaflet';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
+import { useAuth } from '../contexts/AuthContext';
 import 'leaflet/dist/leaflet.css';
 
 const SCENARIOS = ['Normal', 'Flood Event', 'Power Failure', 'High Demand Crisis'];
@@ -22,6 +23,7 @@ export default function AegisMonitor() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const fileInputRef = useRef(null);
+    const { user } = useAuth();
 
     const runAnalysis = async () => {
         setLoading(true);
@@ -34,6 +36,17 @@ export default function AegisMonitor() {
             };
             const res = await axios.post('/api/aegis/analyze', payload);
             setResult(res.data);
+
+            // Save to history
+            if (user) {
+                await axios.post('/api/user/history', {
+                    userId: user.uid,
+                    product: 'AEGIS',
+                    analysisType: 'Fragility Analysis',
+                    summary: `${res.data.summary.critical_count} critical zones, ${res.data.summary.warning_count} warning zones.`,
+                    data: res.data
+                });
+            }
         } catch (err) {
             setError(err.response?.data?.error || 'Analysis failed. Make sure backend services are running.');
         }
