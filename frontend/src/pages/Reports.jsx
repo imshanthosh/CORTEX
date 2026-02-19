@@ -3,7 +3,7 @@
  * Shows user-specific reports and historical analyses.
  */
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -11,6 +11,7 @@ const PRODUCT_COLORS = {
     AEGIS: { text: 'text-cyan-400', badge: 'bg-cyan-500/10 border-cyan-500/20' },
     Marine: { text: 'text-blue-400', badge: 'bg-blue-500/10 border-blue-500/20' },
     AquaCascade: { text: 'text-purple-400', badge: 'bg-purple-500/10 border-purple-500/20' },
+    AquaHear: { text: 'text-pink-400', badge: 'bg-pink-500/10 border-pink-500/20' },
 };
 
 export default function Reports() {
@@ -18,6 +19,7 @@ export default function Reports() {
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState('all');
+    const [selectedReport, setSelectedReport] = useState(null);
 
     useEffect(() => {
         const fetchHistory = async () => {
@@ -74,7 +76,7 @@ export default function Reports() {
             <div className="rounded-2xl bg-slate-900/60 backdrop-blur border border-slate-800/60 px-5 py-4">
                 <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs text-slate-500 font-medium mr-1">Module:</span>
-                    {['all', 'AEGIS', 'Marine', 'AquaCascade'].map(p => (
+                    {['all', 'AEGIS', 'Marine', 'AquaCascade', 'AquaHear'].map(p => (
                         <button
                             key={p}
                             onClick={() => setFilter(p)}
@@ -99,7 +101,7 @@ export default function Reports() {
                     {loading ? (
                         <div className="p-12 text-center text-slate-500">⏳ Loading analysis history...</div>
                     ) : filtered.length === 0 ? (
-                        <div className="p-12 text-center text-slate-500">No analyses found. Run a scan in AEGIS or Marine to see results here.</div>
+                        <div className="p-12 text-center text-slate-500">No analyses found. Run a scan/simulation to see results here.</div>
                     ) : (
                         <table className="w-full text-sm">
                             <thead>
@@ -133,7 +135,12 @@ export default function Reports() {
                                                 <span className="line-clamp-2">{report.summary}</span>
                                             </td>
                                             <td className="px-6 py-4 text-right whitespace-nowrap">
-                                                <button className="text-xs text-cyan-400 hover:text-cyan-300 font-medium transition-colors mr-4" onClick={() => alert('Detailed view coming soon!')}>View</button>
+                                                <button
+                                                    onClick={() => setSelectedReport(report)}
+                                                    className="text-xs text-cyan-400 hover:text-cyan-300 font-medium transition-colors mr-4"
+                                                >
+                                                    View
+                                                </button>
                                                 <button className="text-xs text-slate-500 hover:text-slate-300 font-medium transition-colors">Export</button>
                                             </td>
                                         </motion.tr>
@@ -144,6 +151,61 @@ export default function Reports() {
                     )}
                 </div>
             </div>
+
+            {/* ── Report Modal ─────────────────────────────────────── */}
+            <AnimatePresence>
+                {selectedReport && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+                            onClick={() => setSelectedReport(null)}
+                        />
+                        <motion.div
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
+                            className="relative w-full max-w-2xl max-h-[80vh] overflow-hidden rounded-3xl bg-slate-900 border border-slate-800 shadow-2xl flex flex-col"
+                        >
+                            <div className="px-8 py-6 border-b border-slate-800 flex items-center justify-between">
+                                <div>
+                                    <h2 className="text-xl font-bold text-white">{selectedReport.product} Report</h2>
+                                    <p className="text-sm text-slate-500 mt-0.5">{selectedReport.analysisType} • {new Date(selectedReport.timestamp).toLocaleString()}</p>
+                                </div>
+                                <button
+                                    onClick={() => setSelectedReport(null)}
+                                    className="w-10 h-10 rounded-full hover:bg-white/5 flex items-center justify-center text-slate-400 transition-colors"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+
+                            <div className="flex-1 overflow-y-auto p-8 space-y-6">
+                                <section>
+                                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Analysis Summary</h3>
+                                    <div className="p-4 rounded-2xl bg-white/[0.02] border border-slate-800/60 text-slate-300 leading-relaxed">
+                                        {selectedReport.summary}
+                                    </div>
+                                </section>
+
+                                <section>
+                                    <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Detailed Data</h3>
+                                    <pre className="p-4 rounded-2xl bg-black/40 border border-slate-800/60 text-[11px] text-cyan-500/80 font-mono overflow-x-auto whitespace-pre-wrap">
+                                        {JSON.stringify(selectedReport.data, null, 2)}
+                                    </pre>
+                                </section> section>
+                            </div>
+
+                            <div className="px-8 py-5 border-t border-slate-800 bg-slate-900/50 flex justify-end gap-3">
+                                <button onClick={() => setSelectedReport(null)} className="btn-secondary px-6">Close</button>
+                                <button className="btn-primary px-6">Download Full Data (JSON)</button>
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+            </AnimatePresence>
         </div>
     );
 }

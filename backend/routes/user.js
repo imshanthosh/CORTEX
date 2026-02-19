@@ -4,9 +4,33 @@
  */
 const express = require('express');
 const router = express.Router();
+const admin = require('firebase-admin');
 
-// In-memory store (replace with Firestore in production)
-// When Firebase is configured, swap this for Firestore calls
+// Initialize Firestore if not already initialized
+let db;
+try {
+    if (admin.apps.length === 0) {
+        // Try to initialize using service account if path exists
+        const saPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
+        if (saPath) {
+            const serviceAccount = require(saPath);
+            admin.initializeApp({
+                credential: admin.credential.cert(serviceAccount)
+            });
+            console.log('Firebase Admin initialized via Service Account');
+        } else {
+            // Fallback for Vercel/Production using individual ENV variables if path missing
+            // Or use default credentials
+            admin.initializeApp();
+            console.log('Firebase Admin initialized via Default Credentials');
+        }
+    }
+    db = admin.firestore();
+} catch (error) {
+    console.warn('Firestore initialization failed. Falling back to in-memory store.', error.message);
+}
+
+// In-memory fallback
 let analysisHistory = [];
 
 // GET /api/user/history
@@ -17,6 +41,18 @@ router.get('/history', async (req, res) => {
             return res.status(400).json({ error: 'userId query param required' });
         }
 
+        if (db) {
+            const snapshot = await db.collection('history')
+                .where('userId', '==', userId)
+                .orderBy('timestamp', 'desc')
+                .limit(50)
+                .get();
+
+            const history = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            return res.json({ history });
+        }
+
+        // Fallback
         const userHistory = analysisHistory
             .filter(h => h.userId === userId)
             .sort((a, b) => b.timestamp - a.timestamp)
@@ -39,7 +75,6 @@ router.post('/history', async (req, res) => {
         }
 
         const entry = {
-            id: Date.now().toString(36) + Math.random().toString(36).substr(2),
             userId,
             product,
             analysisType: analysisType || 'general',
@@ -49,14 +84,17 @@ router.post('/history', async (req, res) => {
             date: new Date().toISOString()
         };
 
-        analysisHistory.push(entry);
-
-        // Keep only last 500 entries in memory
-        if (analysisHistory.length > 500) {
-            analysisHistory = analysisHistory.slice(-500);
+        if (db) {
+            const docRef = await db.collection('history').add(entry);
+            return res.json({ success: true, id: docRef.id, entry });
         }
 
-        res.json({ success: true, entry });
+        // Fallback
+        const localEntry = { id: Date.now().toString(36), ...entry };
+        analysisHistory.push(localEntry);
+        if (analysisHistory.length > 500) analysisHistory = analysisHistory.slice(-500);
+
+        res.json({ success: true, entry: localEntry });
     } catch (error) {
         console.error('History save error:', error.message);
         res.status(500).json({ error: 'Failed to save analysis' });

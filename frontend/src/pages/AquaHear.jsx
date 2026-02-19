@@ -5,6 +5,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import axios from 'axios';
+import { useAuth } from '../contexts/AuthContext';
 
 const ALERT_TYPES = ['Stable', 'Warning', 'High Risk'];
 const LANGUAGES = ['English', 'Hindi', 'Tamil', 'Telugu'];
@@ -16,6 +17,7 @@ export default function AquaHear() {
     const [audioSrc, setAudioSrc] = useState(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const { user } = useAuth();
 
     const generateAlert = async () => {
         setLoading(true);
@@ -28,6 +30,17 @@ export default function AquaHear() {
             });
             if (res.data.audio_base64) {
                 setAudioSrc(`data:audio/mp3;base64,${res.data.audio_base64}`);
+            }
+
+            // Save to history
+            if (user) {
+                await axios.post('/api/user/history', {
+                    userId: user.uid,
+                    product: 'AquaHear',
+                    analysisType: 'Voice Alert',
+                    summary: `${language} ${alertType} alert generated.`,
+                    data: { alertType, language, customMessage }
+                });
             }
         } catch (err) {
             setError(err.response?.data?.error || 'Failed to generate voice alert. Ensure backend is running.');

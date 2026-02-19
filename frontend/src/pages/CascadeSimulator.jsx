@@ -6,6 +6,7 @@ import { useState, useCallback } from 'react';
 import { MapContainer, TileLayer, Circle, Polygon, Marker, Popup, useMapEvents } from 'react-leaflet';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
+import { useAuth } from '../contexts/AuthContext';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -34,6 +35,8 @@ export default function CascadeSimulator() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
+    const { user } = useAuth();
+
     const runSimulation = async () => {
         if (!sourceLocation) { setError('Please click on the map to set contamination source location.'); return; }
         setLoading(true);
@@ -49,6 +52,17 @@ export default function CascadeSimulator() {
             });
             setResult(res.data);
             setCurrentHour(0);
+
+            // Save to history
+            if (user) {
+                await axios.post('/api/user/history', {
+                    userId: user.uid,
+                    product: 'AquaCascade',
+                    analysisType: 'Propagation Sim',
+                    summary: `${simHours}-hour simulation. Max area ${res.data.risk_summary.max_area_km2} km². ${res.data.risk_summary.treatment_plants_at_risk} plants at risk.`,
+                    data: res.data
+                });
+            }
         } catch (err) {
             setError(err.response?.data?.error || 'Simulation failed. Ensure backend services are running.');
         }
