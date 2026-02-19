@@ -39,8 +39,12 @@ app.use((err, req, res, next) => {
 });
 
 // Start server
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`AquaShield AI Backend running on port ${PORT}`);
-  console.log(`Python microservice URL: ${process.env.PYTHON_SERVICE_URL || 'http://localhost:8000'}`);
-});
+if (require.main === module) {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => {
+    console.log(`AquaShield AI Backend running on port ${PORT}`);
+    console.log(`Python microservice URL: ${process.env.PYTHON_SERVICE_URL || 'http://localhost:8000'}`);
+  });
+}
+
+module.exports = app;
